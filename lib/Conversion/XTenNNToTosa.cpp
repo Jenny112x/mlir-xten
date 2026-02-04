@@ -103,9 +103,14 @@ public:
         quantizeOp->getLoc(), constType,
         DenseFPElementsAttr::get(constType, {scaleReciprocal}));
 
+    auto i8Ty = rewriter.getIntegerType(8);
+    auto shiftTy = mlir::RankedTensorType::get(/*shape=*/{}, i8Ty);
+    auto shiftAttr = mlir::SplatElementsAttr::get(shiftTy, rewriter.getI8IntegerAttr(0));
+    auto shiftConst = rewriter.create<mlir::tosa::ConstOp>(quantizeOp->getLoc(), shiftTy, shiftAttr);
+
     auto mulOp = rewriter.create<tosa::MulOp>(
         quantizeOp.getLoc(), inputType, quantizeOp->getOperand(0),
-        constOp->getResult(0), getZeroShift(rewriter, quantizeOp.getLoc()));
+        constOp->getResult(0), shiftConst.getResult());
 
     mlir::Value castFrom = mulOp->getResult(0);
     if (!quantizeOp.getZeroPoint().isZero()) {
@@ -194,11 +199,16 @@ public:
         dequantizeOp->getLoc(), constType,
         DenseFPElementsAttr::get(constType, {scale}));
 
+    auto i8Ty = rewriter.getIntegerType(8);
+    auto shiftTy = mlir::RankedTensorType::get(/*shape=*/{}, i8Ty);
+    auto shiftAttr = mlir::SplatElementsAttr::get(shiftTy, rewriter.getI8IntegerAttr(0));
+    auto shiftConst = rewriter.create<mlir::tosa::ConstOp>(dequantizeOp->getLoc(), shiftTy, shiftAttr);
+
     // Replace the dequantize op with the new operations we just created.
     rewriter.replaceOpWithNewOp<tosa::MulOp>(
         dequantizeOp, dequantizeOp->getResult(0).getType(),
         zeroPointSubOp->getResult(0), constOp->getResult(0),
-        getZeroShift(rewriter, dequantizeOp.getLoc()));
+        shiftConst.getResult());
     return success();
   }
 };

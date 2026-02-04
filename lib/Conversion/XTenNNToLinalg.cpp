@@ -48,7 +48,7 @@ Value getEmptyTensor(OpBuilder &b, Location loc, ShapedType type,
                      ArrayRef<Value> dynSizes) {
   return b.create<tensor::EmptyOp>(loc, type.getShape(), type.getElementType(),
                                    dynSizes,
-                                   type.cast<RankedTensorType>().getEncoding());
+                                   cast<RankedTensorType>(type).getEncoding());
 }
 
 // Elu(x) = x > 0 ? x : alpha * (exp(x) - 1)
@@ -65,8 +65,9 @@ Value mapEluOpToArithAndMathOps(EluOp op, ArrayRef<Type> /*resultTypes*/,
   Value one =
       b->create<arith::ConstantOp>(loc, b->getFloatAttr(elementType, 1));
   Value sub = b->create<::mlir::arith::SubFOp>(loc, exp, one);
+  llvm::APFloat alphaValue = EluOpAdaptor(op).getAlpha();
   Value alphaAsValue = b->create<mlir::arith::ConstantFloatOp>(
-      loc, EluOpAdaptor(op).getAlpha(), cast<FloatType>(elementType));
+      loc, alphaValue, cast<FloatType>(elementType));
   Value mul = b->create<::mlir::arith::MulFOp>(loc, alphaAsValue, sub);
 
   // Build: x > 0 ? x : alpha * (exp(x) - 1)
